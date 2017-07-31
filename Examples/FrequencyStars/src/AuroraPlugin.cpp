@@ -73,7 +73,7 @@ typedef struct {
     int B;
 } source_t;
 
-/** Here we store the information accociated with each frequency bin. This 
+/** Here we store the information accociated with each frequency bin. This
  allows for tracking a degree of historical information.
  */
 typedef struct {
@@ -94,10 +94,10 @@ static source_t sources[MAX_PALETTE_COLOURS]; // this is our array for sources
 static int nSources = 0;
 static freq_bin freq_bins[MAX_PALETTE_COLOURS]; // this is our array for frequency bin historical information.
 
-/** 
+/**
   * @description: add a value to a running max.
-  * @param: runningMax is current runningMax, valueToAdd is added to runningMax, effectiveTrail  
-  *         defines how many values are effectively tracked. Note this is an approximation. 
+  * @param: runningMax is current runningMax, valueToAdd is added to runningMax, effectiveTrail
+  *         defines how many values are effectively tracked. Note this is an approximation.
   * @return: int returned as new runningMax.
   */
 int addToRunningMax(int runningMax, int valueToAdd, int effectiveTrail) {
@@ -118,7 +118,8 @@ int addToRunningMax(int runningMax, int valueToAdd, int effectiveTrail) {
  *
  */
 void initPlugin() {
-
+	// static RGB_t* paletteColours = NULL;
+	// static int nColours = 0;
     getColorPalette(&paletteColours, &nColours);  // grab the palette colours and store a pointer to them for later use
     PRINTLOG("The palette has %d colours:\n", nColours);
     if(nColours > MAX_PALETTE_COLOURS) {
@@ -129,16 +130,16 @@ void initPlugin() {
     for (int i = 0; i < nColours; i++) {
         PRINTLOG("   %d %d %d\n", paletteColours[i].R, paletteColours[i].G, paletteColours[i].B);
     }
-    
+
     layoutData = getLayoutData(); // grab the layout data and store a pointer to it for later use
-  
-    
+
+
     PRINTLOG("The layout has %d panels:\n", layoutData->nPanels);
     for (int i = 0; i < layoutData->nPanels; i++) {
         PRINTLOG("   Id: %d   X, Y: %lf, %lf\n", layoutData->panels[i].panelId,
                layoutData->panels[i].shape->getCentroid().x, layoutData->panels[i].shape->getCentroid().y);
     }
-    
+
     // here we initialize our freqency bin values so that the plugin starts working reasonably well right away
     for (int i = 0; i < MAX_PALETTE_COLOURS; i++) {
         freq_bins[i].latest_minimum = 0;
@@ -164,7 +165,7 @@ float distance(float x1, float y1, float x2, float y2)
 }
 
 
-/** 
+/**
   * @description: compute the distance from a point to a line
   * @param: x1, y1 and x2, y2 are two points that define the line
   *         x3, y3 is the point
@@ -185,7 +186,7 @@ void point2line(float x3, float y3, float x1, float y1, float x2, float y2, floa
     *dist = sqrt(dx * dx + dy * dy);
 }
 
-/** 
+/**
   * @description: Adds a light source to the list of light sources. The light source will have a particular colour
   * and intensity and will move at a particular speed.
 */
@@ -212,7 +213,7 @@ void addSource(int paletteIndex, float intensity, float speed)
             break;
         }
     }
-    
+
     // find a vector pointing from one of the panels to the other
     float x1 = layoutData->panels[n1].shape->getCentroid().x;
     float y1 = layoutData->panels[n1].shape->getCentroid().y;
@@ -225,7 +226,7 @@ void addSource(int paletteIndex, float intensity, float speed)
     // compute a velocity vector based on the desired speed and normalize to the panel size
     vx *= normalization * speed * ADJACENT_PANEL_DISTANCE;
     vy *= normalization * speed * ADJACENT_PANEL_DISTANCE;
-    
+
     // iterate through all panels and find the one that is closest to the edge of the
     // Aurora setup and near the line where the "shooting star" will traverse; this
     // will be the starting point of the light source
@@ -260,7 +261,7 @@ void addSource(int paletteIndex, float intensity, float speed)
     if(nSources >= MAX_SOURCES) {
         removeSource(0);
     }
-    
+
     // add all the information to the list of light sources
     sources[nSources].x = x;
     sources[nSources].y = y;
@@ -324,17 +325,17 @@ void propogateSources(void)
 /**
   * A simple algorithm to detect beats. It finds a strong signal after a period of quietness.
   * Actually, it doesn't detect just beats. For example, classical music often doesn't have
-  * strong beats but it has strong instrumental sections. Those would also get detected. 
+  * strong beats but it has strong instrumental sections. Those would also get detected.
   */
 int16_t beat_detector(int i)
 {
     int16_t beat_detected = 0;
-    
+
     //Check for local maximum and if observed, add to running average
     if((freq_bins[i].soundPower + (freq_bins[i].runningMax / 4) < freq_bins[i].previousPower) && (freq_bins[i].previousPower > freq_bins[i].secondPreviousPower)){
         freq_bins[i].runningMax = addToRunningMax(freq_bins[i].runningMax, freq_bins[i].previousPower, 4);
     }
-    
+
     // update latest minimum.
     if(freq_bins[i].soundPower < freq_bins[i].latest_minimum) {
         freq_bins[i].latest_minimum = freq_bins[i].soundPower;
@@ -342,17 +343,17 @@ int16_t beat_detector(int i)
     else if(freq_bins[i].latest_minimum > 0) {
         freq_bins[i].latest_minimum--;
     }
-    
+
     // criteria for a "beat"; value must exceed minimum plus a threshold of the runningMax.
     if(freq_bins[i].soundPower > freq_bins[i].latest_minimum + (freq_bins[i].runningMax * TRIGGER_THRESHOLD)) {
         freq_bins[i].latest_minimum = freq_bins[i].soundPower;
         beat_detected = 1;
     }
-    
+
     // update historical information
     freq_bins[i].secondPreviousPower = freq_bins[i].previousPower;
     freq_bins[i].previousPower = freq_bins[i].soundPower;
-    
+
     return beat_detected;
 }
 
@@ -382,24 +383,24 @@ void getPluginFrame(Frame_t* frames, int* nFrames, int* sleepTime) {
     for(i = 0; i < nColours; i++) {
         freq_bins[i].soundPower = fftBins[i];
         uint8_t beat_detected = beat_detector(i);
-        
+
         if(beat_detected) {
             if (freq_bins[i].soundPower > freq_bins[i].maximumTrigger) {
                 freq_bins[i].maximumTrigger = freq_bins[i].soundPower;
             }
-            
+
             float speed = 0.5;
             float intensity = 1.0;
-            
+
             //calculate an intensity ranging from minimum to 1, using log scale
             if (freq_bins[i].soundPower > 1 && freq_bins[i].runningMax > 1){
                 intensity = ((log((float)freq_bins[i].soundPower) / log((float)freq_bins[i].runningMax)) * (1.0 - MINIMUM_INTENSITY)) + MINIMUM_INTENSITY;
             }
-            
+
             if (intensity > 1.0) {
                 intensity = 1.0;
             }
-            
+
             // add a new light source for each beat detected
             addSource(i, intensity, speed);
         }
